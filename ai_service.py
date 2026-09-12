@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from core import AnalysisResult
 
 
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-2.5-flash-lite"
 
 
 class AIAnalysis(BaseModel):
@@ -62,8 +62,6 @@ def _generate(
     if not api_key or not api_key.strip():
         raise ValueError("Ingresá una Gemini API Key.")
 
-    # Un máximo de tres intentos por consulta.
-    # Solo se reintentan errores temporales del servidor.
     http_options = types.HttpOptions(
         timeout=60000,
         retry_options=types.HttpRetryOptions(
@@ -98,31 +96,29 @@ def _generate(
 
         if code == 503:
             raise RuntimeError(
-                "Gemini sigue sin disponibilidad después de "
-                "los reintentos automáticos. El análisis con IA "
-                "no se completó. No cambies tu clave ni actives "
-                "facturación por este error."
+                f"El modelo {MODEL} sigue sin disponibilidad "
+                "después de los reintentos. "
+                "El análisis con IA no se completó."
             ) from None
 
         if code == 429:
             raise RuntimeError(
-                "Google informó un límite de solicitudes o cuota "
-                "(429). Revisá el uso y los límites en Google AI "
-                "Studio antes de volver a intentar."
+                f"Google informó un límite de solicitudes o cuota "
+                f"para {MODEL} (429). Revisá los límites por minuto "
+                "y por día en Google AI Studio antes de reintentar."
             ) from None
 
         if code in (401, 403):
             raise RuntimeError(
                 "Google rechazó la autenticación o los permisos. "
-                "Revisá la clave y el acceso al proyecto en AI Studio. "
+                "Revisá la clave y el proyecto en AI Studio. "
                 "No compartas la clave."
             ) from None
 
         if code == 404:
             raise RuntimeError(
                 f"Google no encontró el modelo {MODEL} o no está "
-                "disponible para este proyecto. Debemos revisar "
-                "los modelos habilitados antes de cambiar el código."
+                "disponible para este proyecto."
             ) from None
 
         if code in (500, 502, 504):
@@ -135,12 +131,9 @@ def _generate(
         if code == 400:
             raise RuntimeError(
                 "Google rechazó la solicitud (400). "
-                "Debemos revisar la configuración del modelo "
-                "y la validez de la clave."
+                "Debemos revisar los parámetros y la clave."
             ) from None
 
-        # No mostrar el error crudo para evitar exponer
-        # detalles de la solicitud o credenciales.
         raise RuntimeError(
             "No se pudo completar la consulta a Gemini. "
             f"Tipo de error: {type(exc).__name__}. "
@@ -185,7 +178,7 @@ CRITERIOS
 - Entregá 3 fortalezas sustentadas en el CV.
   Si no hay suficientes, explicitá la limitación.
 - Entregá entre 3 y 5 recomendaciones accionables.
-- Aclar á que el puntaje no reproduce un ATS comercial.
+- Aclará que el puntaje no reproduce un ATS comercial.
 """
 
     text = _generate(
@@ -203,8 +196,8 @@ CRITERIOS
         parsed = AIAnalysis.model_validate_json(text)
     except ValueError:
         raise ValueError(
-            "El diagnóstico de Gemini no cumplió el formato "
-            "esperado. No se publicará un resultado inválido."
+            "El diagnóstico no cumplió el formato esperado. "
+            "No se publicará un resultado inválido."
         ) from None
 
     return AnalysisResult(
